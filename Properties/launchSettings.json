@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "konlulu": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "KONLULU_ENVIRONMENT": "Dev"
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+﻿timed konlulu~ bomb
+minimum 3 players
+role:
+the one who have the doll: HOLDER
+the one who have the doll when it explode: to be defined
+the one who got splash damage when the doll explode: to be defined
+instruction:
+one person will be selected to start the game -> starter
+starter will be given the konlulu~ doll
+once starter flip the konlulu~ switch behind the doll, the game start
+everyone's passing the doll along, while the doll is saying "kon, kon" with its eyes flashing red
+* define passing the doll along, should the HOLDER have to specify the receiver or should it be random?
+* or should it be along a pre-determined order?
+* Kaiser: You can make an array of people based on who joined to determine who gets passed down to and by product, who is nearby
+the "kon, kon" get faster and faster, ultimately ending with an explosion
+* define the exact timing of the "kon, kon"(henceforth abbriviated into KON)
+* Void: the fuse timer is random every match
+* animating the KON on the doll and the voice
+for the one that hold the doll when it explode, it's "game over" for him
+* define game over, should be some kind of hp based punishment
+* Void: when the bomb explodes, only the person who last held the bomb survives
+* also the explosion have a aoe damage so everyone near the "game over" will receive the damage too, albeit lesser.
+after the doll explode, the game end.
+
+discord's command:
+.i|.init		: initiate the game, can only run once in a channel
+.r|.register	: participate in a initiating game
+.s|.start		: vote to start the initiating game
+.p|.pass		: pass the doll
+.o|.offer <s>	: offer up to 10 second to speedup the doll's timer
