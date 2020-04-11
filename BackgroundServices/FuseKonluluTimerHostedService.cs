@@ -81,6 +81,18 @@ namespace konlulu.BackgroundServices
                                         announcement = $"Through dedication to the cause of the Debilulu Church, {winner.Mention} has emerged as a new man, blessed by the Queen of Yharnam herself";
                                     }
 
+                                    IPlayerDatabaseHandler playerDb = scope.ServiceProvider.GetRequiredService<IPlayerDatabaseHandler>();
+
+                                    // update stat
+                                    winner.GameWin++;
+                                    foreach (GamePlayerEntity gep in playerOrderByOffer)
+                                    {
+                                        PlayerEntity player = gep.Player;
+                                        player.GamePlayed++;
+                                        player.TotalOffer += gep.Offer;
+                                        playerDb.Save(player);
+                                    }
+
                                     await channel.SendMessageAsync(announcement);
                                 }
                             }
