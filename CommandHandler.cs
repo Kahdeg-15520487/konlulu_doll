@@ -42,7 +42,14 @@ namespace konlulu
             Console.WriteLine("Discord Modules loaded:");
             foreach (ModuleInfo module in modules)
             {
-                Console.WriteLine(module);
+                Console.WriteLine(module.Name);
+                Console.WriteLine(module.Summary);
+                Console.WriteLine("Commands: ");
+                foreach (CommandInfo cmd in module.Commands)
+                {
+                    Console.WriteLine(cmd.Name);
+                    Console.WriteLine(cmd.Summary);
+                }
             }
         }
 

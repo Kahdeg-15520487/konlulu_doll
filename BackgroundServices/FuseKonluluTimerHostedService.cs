@@ -69,7 +69,8 @@ namespace konlulu.BackgroundServices
                                     IGamePlayerDatabaseHandler gepDb = scope.ServiceProvider.GetRequiredService<IGamePlayerDatabaseHandler>();
                                     IOrderedEnumerable<GamePlayerEntity> playerOrderByOffer = gepDb.GetPlayerInGame(game.Id).OrderByDescending(gep => gep.Offer);
                                     GamePlayerEntity mostOffer = playerOrderByOffer.First();
-                                    if (mostOffer.Player.Id.Equals(game.Holder.Id))
+                                    if (mostOffer.Player.Id.Equals(game.Holder.Id)
+                                        && game.PlayerCount >= 3)
                                     {
                                         winner = playerOrderByOffer.ElementAt(1).Player;
                                         announcement = $"Although {mostOffer.Player.Mention} has offered most of his soul to KonLulu~ he got exploded due to his greed and thus {winner.Mention} is the final Winner";

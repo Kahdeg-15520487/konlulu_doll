@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 
 namespace konlulu.Modules
 {
+    [Name("Administration and debug module")]
+    [Summary("For when the game doesn't work as intended")]
     public class AdministrationModule : ModuleBase<SocketCommandContext>
     {
         private readonly IGameDatabaseHandler gameDb;

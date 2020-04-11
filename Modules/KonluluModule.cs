@@ -14,6 +14,8 @@ using System.Threading.Tasks;
 
 namespace konlulu.Modules
 {
+    [Name("KonLulu~")]
+    [Summary("Main module for playing the game")]
     public class KonluluModule : ModuleBase<SocketCommandContext>
     {
         private static readonly int OFFER_COOLDOWN = 5;
@@ -51,7 +53,7 @@ namespace konlulu.Modules
         {
             GameEntity game = new GameEntity()
             {
-                StartTime = DateTime.UtcNow,
+                StartTime = DateTime.Now,
                 GameStatus = GameStatus.Initiating,
                 ChannelId = this.Context.Channel.Id,
                 ChannelName = this.Context.Channel.Name
@@ -85,10 +87,10 @@ namespace konlulu.Modules
             {
                 Game = game,
                 Player = player,
-                JoinTime = DateTime.UtcNow,
+                JoinTime = DateTime.Now,
                 JoinOrder = gepDb.GetJoinOrder(game.Id),
                 Offer = 0,
-                LastOffer = DateTime.UtcNow
+                LastOffer = DateTime.Now
             };
 
             gepDb.Save(gep);
@@ -116,7 +118,7 @@ namespace konlulu.Modules
             //    return base.ReplyAsync("There is not enough player to start the game!");
             //}
 
-            game.StartTime = DateTime.UtcNow;
+            game.StartTime = DateTime.Now;
             game.GameStatus = GameStatus.Playing;
             game.KonCount = 0;
             game.FuseTime = random.Next(MIN_FUSE_TIME, MAX_FUSE_TIME) * 1000;
@@ -124,6 +126,8 @@ namespace konlulu.Modules
             game.Holder = GetRandomPlayerInGame(game.Id);
             game.PlayerCount = gepDb.GetPlayerInGame(game.Id).Count();
             gameDb.Save(game);
+
+            Console.WriteLine(game.FuseTime);
 
             recurringTimerQueue.QueueBackgroundWorkItem((c) => RecurringTimer(c, game));
             fuseTimerQueue.QueueBackgroundWorkItem((c) => FuseTimer(c, game));
@@ -167,8 +171,10 @@ namespace konlulu.Modules
             {
                 return ReplyAsync($"Wrong channel, please turn back to channel {game.ChannelName}");
             }
-            GamePlayerEntity gep = this.GetGEPFromPlayer(holder);
-            TimeSpan timeSinceLastOffer = (DateTime.UtcNow - gep.LastOffer);
+
+            GamePlayerEntity gep = this.GetGEPFromPlayerAndGame(holder, game);
+
+            TimeSpan timeSinceLastOffer = (DateTime.Now - gep.LastOffer);
             if (timeSinceLastOffer.TotalSeconds <= OFFER_COOLDOWN)
             {
                 return ReplyAsync($"You can't offer that fast, please wait {OFFER_COOLDOWN - timeSinceLastOffer.TotalSeconds}");
@@ -184,10 +190,15 @@ namespace konlulu.Modules
             gameDb.Save(game);
 
             gep.Offer += offer;
-            gep.LastOffer = DateTime.UtcNow;
+            gep.LastOffer = DateTime.Now;
             gepDb.Save(gep);
 
             return base.ReplyAsync($"{holder.Mention} offered {offer}");
+        }
+
+        private GamePlayerEntity GetGEPFromPlayerAndGame(PlayerEntity holder, GameEntity game)
+        {
+            return gepDb.Querry(gep => gep.Game.Id.Equals(game.Id) && gep.Player.Id.Equals(holder.Id)).FirstOrDefault();
         }
 
         private PlayerEntity CreateUser()
