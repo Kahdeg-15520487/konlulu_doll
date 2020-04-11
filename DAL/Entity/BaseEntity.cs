@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using LiteDB;
 
 namespace konlulu.DAL.Entity
 {
     public class BaseEntity
     {
-        public object Id { get; set; }
+        public ObjectId Id { get; set; }
     }
 }

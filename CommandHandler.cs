@@ -43,7 +43,7 @@ namespace konlulu
         private async Task HandleCommandAsync(SocketMessage messageParam)
         {
             // Don't process the command if it was a system message
-            var message = messageParam as SocketUserMessage;
+            SocketUserMessage message = messageParam as SocketUserMessage;
             if (message == null) return;
 
             // Create a number to track where the prefix ends and the command begins
@@ -56,14 +56,14 @@ namespace konlulu
                 return;
 
             // Create a WebSocket-based command context based on the message
-            var context = new SocketCommandContext(_client, message);
+            SocketCommandContext context = new SocketCommandContext(_client, message);
 
             // Execute the command with the command context we just
             // created, along with the service provider for precondition checks.
             await _commands.ExecuteAsync(
                 context: context,
                 argPos: argPos,
-                services: null);
+                services: this.serviceProvider);
         }
     }
 }

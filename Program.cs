@@ -1,9 +1,14 @@
 ﻿using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using konlulu.BackgroundServices;
 using konlulu.DAL;
+using konlulu.DAL.Entity;
+using konlulu.DAL.Interfaces;
+using LiteDB;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -17,34 +22,12 @@ namespace konlulu
 
         public async Task MainAsync()
         {
-            using (ServiceProvider services = ConfigureServices())
-            {
-                LoadConfiguration();
-                DiscordSocketClient client = services.GetRequiredService<DiscordSocketClient>();
-                client.Log += Log;
-                services.GetRequiredService<CommandService>().Log += Log;
-
-                string token = configuration["_BOTTOKEN"];
-
-                await client.LoginAsync(TokenType.Bot, token);
-                await client.StartAsync();
-
-                var dd = services.GetRequiredService<IDatabaseHandler>();
-
-                await services.GetRequiredService<CommandHandler>().InstallCommandsAsync();
-                
-                //infinite wait
-                await Task.Delay(-1);
-            }
+            await new HostBuilder()
+                      .ConfigureServices(ConfigureServices)
+                      .RunConsoleAsync();
         }
 
         private static IConfiguration configuration;
-
-        private Task Log(LogMessage msg)
-        {
-            Console.WriteLine(msg.ToString());
-            return Task.CompletedTask;
-        }
 
         private static IConfiguration LoadConfiguration()
         {
@@ -56,23 +39,43 @@ namespace konlulu
             return builder.Build();
         }
 
-        private static ServiceProvider ConfigureServices()
+        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
         {
             configuration = LoadConfiguration();
-            IServiceCollection serviceCollection = new ServiceCollection()
-                                                    .AddSingleton<IConfiguration>(configuration)
-                                                    .AddSingleton<DiscordSocketClient>()
-                                                    .AddSingleton<CommandService>()
-                                                    .AddSingleton<CommandHandler>()
-                                                    .AddSingleton<HttpClient>()
-                                                    .AddTransient<IDatabaseHandler, DatabaseHandler>()
-                                                    ;
-            foreach (ServiceDescriptor service in serviceCollection)
+            services.AddSingleton<IConfiguration>(configuration)
+                    .AddSingleton<DiscordSocketClient>()
+                    .AddSingleton<CommandService>()
+                    .AddSingleton<CommandHandler>()
+                    .AddSingleton<HttpClient>()
+                    .AddTransient(typeof(IBaseDatabaseHandler<>), typeof(BaseDatabaseHandler<>))
+                    .AddTransient<IGameDatabaseHandler, GameDatabaseHandler>()
+                    .AddTransient<IPlayerDatabaseHandler, PlayerDatabaseHandler>()
+                    .AddTransient<IGamePlayerDatabaseHandler, GamePlayerDatabaseHandler>()
+                    .AddSingleton(typeof(IBackgroundTaskQueue<>), typeof(BackgroundTaskQueue<>))
+                    .AddHostedService<DiscordHandlerHostedService>()
+                    .AddHostedService<RecurringKonluluTimerHostedService>()
+                    .AddHostedService<FuseKonluluTimerHostedService>()
+                    .AddSingleton<Random>(new Random())
+                    ;
+            foreach (ServiceDescriptor service in services)
             {
                 Console.WriteLine($"Service: {service.ServiceType.FullName}\n      Lifetime: {service.Lifetime}\n      Instance: {service.ImplementationType?.FullName}");
             }
+        }
 
-            return serviceCollection.BuildServiceProvider();
+        private static void InitDatabase()
+        {
+            BsonMapper mapper = BsonMapper.Global;
+
+            mapper.Entity<PlayerEntity>()
+                  .Id(x => x.Id);
+            mapper.Entity<GameEntity>()
+                  .Id(x => x.Id)
+                  .DbRef(x => x.PlayerWon, nameof(PlayerEntity));
+            mapper.Entity<GamePlayerEntity>()
+                  .Id(x => x.Id)
+                  .DbRef(x => x.Player, nameof(PlayerEntity))
+                  .DbRef(x => x.Game, nameof(GameEntity));
         }
     }
 }

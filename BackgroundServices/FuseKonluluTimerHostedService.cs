@@ -1,0 +1,87 @@
+﻿using Discord.WebSocket;
+using konlulu.DAL;
+using konlulu.DAL.Entity;
+using konlulu.DAL.Interfaces;
+using konlulu.Modules;
+using LiteDB;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace konlulu.BackgroundServices
+{
+    class FuseKonluluTimerHostedService : BackgroundService
+    {
+        private readonly IBackgroundTaskQueue<(FuseTimer, ObjectId)> taskQueue;
+        private readonly IServiceScopeFactory serviceScopeFactory;
+
+        public FuseKonluluTimerHostedService(IBackgroundTaskQueue<(FuseTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory)
+        {
+            this.taskQueue = taskQueue;
+            this.serviceScopeFactory = serviceScopeFactory;
+        }
+        public override Task StartAsync(CancellationToken cancellationToken)
+        {
+            Console.WriteLine("Timer Manager Service started");
+            return base.StartAsync(cancellationToken);
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken cancelToken)
+        {
+            try
+            {
+                while (!cancelToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        Func<CancellationToken, Task<(FuseTimer, ObjectId)>> workItem = await taskQueue.DequeueAsync(cancelToken);
+                        (FuseTimer t, ObjectId gameId) konluluTimer = await workItem(cancelToken);
+                        Console.WriteLine(konluluTimer);
+                        {
+                            using (IServiceScope scope = serviceScopeFactory.CreateScope())
+                            {
+                                IGameDatabaseHandler gameDb = scope.ServiceProvider.GetRequiredService<IGameDatabaseHandler>();
+                                ObjectId gameId = new ObjectId(konluluTimer.gameId);
+                                GameEntity game = gameDb.Get(gameId);
+                                game.FuseCount++;
+                                if (game.FuseCount * 1000 < game.FuseTime)
+                                {
+                                    gameDb.Save(game);
+                                    taskQueue.QueueBackgroundWorkItem((c) => KonluluModule.FuseTimer(c, game));
+                                }
+                                else
+                                {
+                                    DiscordSocketClient discordClient = scope.ServiceProvider.GetRequiredService<DiscordSocketClient>();
+                                    ISocketMessageChannel channel = discordClient.GetChannel(game.ChannelId) as ISocketMessageChannel;
+
+                                    //Do your stuff
+                                    game.GameStatus = GameStatus.Ended;
+                                    gameDb.Save(game);
+                                    await channel.SendMessageAsync("Boom!");
+                                    //announce winner
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                        Console.WriteLine(ex.StackTrace);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.WriteLine(ex.StackTrace);
+            }
+        }
+        public override Task StopAsync(CancellationToken cancellationToken)
+        {
+            Console.WriteLine("Timer Manager Service stopped");
+            return base.StopAsync(cancellationToken);
+        }
+    }
+}
