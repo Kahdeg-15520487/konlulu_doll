@@ -7,6 +7,7 @@ using LiteDB;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -24,7 +25,7 @@ namespace konlulu.BackgroundServices
         }
         public override Task StartAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Timer Manager Service started");
+            Console.WriteLine("Fuse Timer Manager Service started");
             return base.StartAsync(cancellationToken);
         }
 
@@ -38,7 +39,6 @@ namespace konlulu.BackgroundServices
                     {
                         Func<CancellationToken, Task<(FuseTimer, ObjectId)>> workItem = await taskQueue.DequeueAsync(cancelToken);
                         (FuseTimer t, ObjectId gameId) konluluTimer = await workItem(cancelToken);
-                        Console.WriteLine(konluluTimer);
                         {
                             using (IServiceScope scope = serviceScopeFactory.CreateScope())
                             {
@@ -46,6 +46,7 @@ namespace konlulu.BackgroundServices
                                 ObjectId gameId = new ObjectId(konluluTimer.gameId);
                                 GameEntity game = gameDb.Get(gameId);
                                 game.FuseCount++;
+                                Console.WriteLine($"{konluluTimer.gameId}:{game.FuseCount}");
                                 if (game.FuseCount * 1000 < game.FuseTime)
                                 {
                                     gameDb.Save(game);
@@ -61,6 +62,25 @@ namespace konlulu.BackgroundServices
                                     gameDb.Save(game);
                                     await channel.SendMessageAsync("Boom!");
                                     //announce winner
+
+                                    PlayerEntity winner = null;
+                                    string announcement = null;
+
+                                    IGamePlayerDatabaseHandler gepDb = scope.ServiceProvider.GetRequiredService<IGamePlayerDatabaseHandler>();
+                                    IOrderedEnumerable<GamePlayerEntity> playerOrderByOffer = gepDb.GetPlayerInGame(game.Id).OrderByDescending(gep => gep.Offer);
+                                    GamePlayerEntity mostOffer = playerOrderByOffer.First();
+                                    if (mostOffer.Player.Id.Equals(game.Holder.Id))
+                                    {
+                                        winner = playerOrderByOffer.ElementAt(1).Player;
+                                        announcement = $"Although {mostOffer.Player.Mention} has offered most of his soul to KonLulu~ he got exploded due to his greed and thus {winner.Mention} is the final Winner";
+                                    }
+                                    else
+                                    {
+                                        winner = mostOffer.Player;
+                                        announcement = $"Through dedication to the cause of the Debilulu Church, {winner.Mention} has emerged as a new man, blessed by the Queen of Yharnam herself";
+                                    }
+
+                                    await channel.SendMessageAsync(announcement);
                                 }
                             }
                         }
@@ -80,7 +100,7 @@ namespace konlulu.BackgroundServices
         }
         public override Task StopAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Timer Manager Service stopped");
+            Console.WriteLine("Fuse Timer Manager Service stopped");
             return base.StopAsync(cancellationToken);
         }
     }

@@ -41,16 +41,21 @@ namespace konlulu
 
         private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
         {
+            InitDatabase();
+
             configuration = LoadConfiguration();
             services.AddSingleton<IConfiguration>(configuration)
                     .AddSingleton<DiscordSocketClient>()
                     .AddSingleton<CommandService>()
                     .AddSingleton<CommandHandler>()
                     .AddSingleton<HttpClient>()
+
+                    .AddSingleton<ILiteDatabase>(new LiteDatabase(configuration["_CONNSTR"]))
                     .AddTransient(typeof(IBaseDatabaseHandler<>), typeof(BaseDatabaseHandler<>))
                     .AddTransient<IGameDatabaseHandler, GameDatabaseHandler>()
                     .AddTransient<IPlayerDatabaseHandler, PlayerDatabaseHandler>()
                     .AddTransient<IGamePlayerDatabaseHandler, GamePlayerDatabaseHandler>()
+
                     .AddSingleton(typeof(IBackgroundTaskQueue<>), typeof(BackgroundTaskQueue<>))
                     .AddHostedService<DiscordHandlerHostedService>()
                     .AddHostedService<RecurringKonluluTimerHostedService>()

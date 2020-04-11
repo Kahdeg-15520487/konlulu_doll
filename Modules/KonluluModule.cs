@@ -21,6 +21,7 @@ namespace konlulu.Modules
         private static readonly int KON_TIME = 5000;
         private static readonly int MAX_FUSE_TIME = 40;
         private static readonly int MIN_FUSE_TIME = 30;
+        private static readonly int MIN_PLAYER_COUNT = 3;
 
         private readonly IGameDatabaseHandler gameDb;
         private readonly IPlayerDatabaseHandler playerDb;
@@ -86,7 +87,8 @@ namespace konlulu.Modules
                 Player = player,
                 JoinTime = DateTime.UtcNow,
                 JoinOrder = gepDb.GetJoinOrder(game.Id),
-                Offer = 0
+                Offer = 0,
+                LastOffer = DateTime.UtcNow
             };
 
             gepDb.Save(gep);
@@ -109,7 +111,7 @@ namespace konlulu.Modules
             }
 
             game.PlayerCount = gepDb.GetPlayerInGame(game.Id).Count();
-            //if (game.PlayerCount <= 3)
+            //if (game.PlayerCount <= MIN_PLAYER_COUNT)
             //{
             //    return base.ReplyAsync("There is not enough player to start the game!");
             //}
@@ -178,13 +180,14 @@ namespace konlulu.Modules
             }
 
             // calculate offer
-            game.KonCount += offer / 2;
-            gep.Offer += offer;
-            gep.LastOffer = DateTime.UtcNow;
-
+            game.FuseCount += offer / 2;
             gameDb.Save(game);
 
-            return base.ReplyAsync($"offered {offer}");
+            gep.Offer += offer;
+            gep.LastOffer = DateTime.UtcNow;
+            gepDb.Save(gep);
+
+            return base.ReplyAsync($"{holder.Mention} offered {offer}");
         }
 
         private PlayerEntity CreateUser()

@@ -24,7 +24,7 @@ namespace konlulu.BackgroundServices
         }
         public override Task StartAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Timer Manager Service started");
+            Console.WriteLine("Kon Timer Manager Service started");
             return base.StartAsync(cancellationToken);
         }
 
@@ -76,7 +76,7 @@ namespace konlulu.BackgroundServices
         }
         public override Task StopAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Timer Manager Service stopped");
+            Console.WriteLine("Kon Timer Manager Service stopped");
             return base.StopAsync(cancellationToken);
         }
     }

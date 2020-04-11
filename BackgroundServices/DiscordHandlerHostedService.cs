@@ -37,8 +37,15 @@ namespace konlulu.BackgroundServices
 
             await client.LoginAsync(TokenType.Bot, token);
             await client.StartAsync();
-
-            await services.GetRequiredService<CommandHandler>().InstallCommandsAsync();
+            try
+            {
+                await services.GetRequiredService<CommandHandler>().InstallCommandsAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.WriteLine(ex.StackTrace);
+            }
 
             //infinite wait
             await Task.Delay(-1);
