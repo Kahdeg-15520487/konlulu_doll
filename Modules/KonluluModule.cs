@@ -5,6 +5,7 @@ using konlulu.DAL;
 using konlulu.DAL.Entity;
 using konlulu.DAL.Interfaces;
 using LiteDB;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,28 +19,32 @@ namespace konlulu.Modules
     [Summary("Main module for playing the game")]
     public class KonluluModule : ModuleBase<SocketCommandContext>
     {
-        private static readonly int OFFER_COOLDOWN = 5;
-        private static readonly int MAX_OFFER = 10;
-        private static readonly int KON_TIME = 5000;
-        private static readonly int MAX_FUSE_TIME = 40;
-        private static readonly int MIN_FUSE_TIME = 30;
-        private static readonly int MIN_PLAYER_COUNT = 3;
+        public static readonly int OFFER_COOLDOWN = 5;
+        public static readonly int MAX_OFFER = 10;
+        public static readonly int KON_TIME = 5000;
+        public static readonly int MAX_FUSE_TIME = 40;
+        public static readonly int MIN_FUSE_TIME = 30;
+        public static readonly int MIN_PLAYER_COUNT = 3;
 
-        private readonly IGameDatabaseHandler gameDb;
-        private readonly IPlayerDatabaseHandler playerDb;
-        private readonly IGamePlayerDatabaseHandler gepDb;
+        private readonly IGameRepository gameDb;
+        private readonly IPlayerRepository playerDb;
+        private readonly IGamePlayerRepository gepDb;
+        private readonly IConfigRepository configDb;
         private readonly Random random;
         private readonly IBackgroundTaskQueue<(RecurringTimer, ObjectId)> recurringTimerQueue;
         private readonly IBackgroundTaskQueue<(FuseTimer, ObjectId)> fuseTimerQueue;
+        private readonly ILogger<KonluluModule> logger;
 
-        public KonluluModule(IGameDatabaseHandler gameDb, IPlayerDatabaseHandler playerDb, IGamePlayerDatabaseHandler gepDb, Random random, IBackgroundTaskQueue<(RecurringTimer, ObjectId)> recurringTimerQueue, IBackgroundTaskQueue<(FuseTimer, ObjectId)> fuseTimerQueue)
+        public KonluluModule(IGameRepository gameDb, IPlayerRepository playerDb, IGamePlayerRepository gepDb, IConfigRepository configDb, Random random, IBackgroundTaskQueue<(RecurringTimer, ObjectId)> recurringTimerQueue, IBackgroundTaskQueue<(FuseTimer, ObjectId)> fuseTimerQueue, ILogger<KonluluModule> logger)
         {
             this.gameDb = gameDb;
             this.playerDb = playerDb;
             this.gepDb = gepDb;
+            this.configDb = configDb;
             this.random = random;
             this.recurringTimerQueue = recurringTimerQueue;
             this.fuseTimerQueue = fuseTimerQueue;
+            this.logger = logger;
         }
 
         protected override void BeforeExecute(CommandInfo command)
@@ -59,7 +64,7 @@ namespace konlulu.Modules
                 ChannelName = this.Context.Channel.Name
             };
             LiteDB.ObjectId gameId = gameDb.Save(game);
-            Console.WriteLine(gameId.ToString());
+            logger.LogInformation(gameId.ToString());
             return base.ReplyAsync($"init game {gameId.ToString()} on channel {game.ChannelName}");
         }
 
@@ -113,21 +118,24 @@ namespace konlulu.Modules
             }
 
             game.PlayerCount = gepDb.GetPlayerInGame(game.Id).Count();
-            //if (game.PlayerCount <= MIN_PLAYER_COUNT)
-            //{
-            //    return base.ReplyAsync("There is not enough player to start the game!");
-            //}
+            if (game.PlayerCount <= configDb.GetConfigByName(nameof(MIN_PLAYER_COUNT)).ConfigValue)
+            {
+                return base.ReplyAsync("There is not enough player to start the game!");
+            }
 
             game.StartTime = DateTime.Now;
             game.GameStatus = GameStatus.Playing;
             game.KonCount = 0;
-            game.FuseTime = random.Next(MIN_FUSE_TIME, MAX_FUSE_TIME) * 1000;
-            game.KonTime = KON_TIME;
+            game.FuseTime = random.Next(
+                                        configDb.GetConfigByName(nameof(MIN_FUSE_TIME)).ConfigValue,
+                                        configDb.GetConfigByName(nameof(MAX_FUSE_TIME)).ConfigValue
+                                       ) * 1000;
+            game.KonTime = configDb.GetConfigByName(nameof(KON_TIME)).ConfigValue;
             game.Holder = GetRandomPlayerInGame(game.Id);
             game.PlayerCount = gepDb.GetPlayerInGame(game.Id).Count();
             gameDb.Save(game);
 
-            Console.WriteLine(game.FuseTime);
+            logger.LogInformation("game.FuseTime:" + game.FuseTime.ToString());
 
             recurringTimerQueue.QueueBackgroundWorkItem((c) => RecurringTimer(c, game));
             fuseTimerQueue.QueueBackgroundWorkItem((c) => FuseTimer(c, game));
@@ -175,18 +183,21 @@ namespace konlulu.Modules
             GamePlayerEntity gep = this.GetGEPFromPlayerAndGame(holder, game);
 
             TimeSpan timeSinceLastOffer = (DateTime.Now - gep.LastOffer);
-            if (timeSinceLastOffer.TotalSeconds <= OFFER_COOLDOWN)
+            int offerCooldown = configDb.GetConfigByName(nameof(OFFER_COOLDOWN)).ConfigValue;
+            if (timeSinceLastOffer.TotalSeconds <= offerCooldown)
             {
-                return ReplyAsync($"You can't offer that fast, please wait {OFFER_COOLDOWN - timeSinceLastOffer.TotalSeconds}");
+                return ReplyAsync($"You can't offer that fast, please wait {offerCooldown - timeSinceLastOffer.TotalSeconds}");
             }
 
-            if (offer >= MAX_OFFER)
+            if (offer >= configDb.GetConfigByName(nameof(MAX_OFFER)).ConfigValue)
             {
-                offer = MAX_OFFER;
+                offer = configDb.GetConfigByName(nameof(MAX_OFFER)).ConfigValue;
             }
 
             // calculate offer
-            game.FuseCount += offer / 2;
+            int calculatedOffer = offer / 2 + 1;
+            calculatedOffer = calculatedOffer > 5 ? 5 : calculatedOffer;
+            game.FuseTime += calculatedOffer;
             gameDb.Save(game);
 
             gep.Offer += offer;

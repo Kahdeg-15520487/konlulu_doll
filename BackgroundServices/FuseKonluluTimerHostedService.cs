@@ -6,8 +6,10 @@ using konlulu.Modules;
 using LiteDB;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,15 +19,17 @@ namespace konlulu.BackgroundServices
     {
         private readonly IBackgroundTaskQueue<(FuseTimer, ObjectId)> taskQueue;
         private readonly IServiceScopeFactory serviceScopeFactory;
+        private readonly ILogger<DiscordHandlerHostedService> logger;
 
-        public FuseKonluluTimerHostedService(IBackgroundTaskQueue<(FuseTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory)
+        public FuseKonluluTimerHostedService(IBackgroundTaskQueue<(FuseTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory, ILogger<DiscordHandlerHostedService> logger)
         {
             this.taskQueue = taskQueue;
             this.serviceScopeFactory = serviceScopeFactory;
+            this.logger = logger;
         }
         public override Task StartAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Fuse Timer Manager Service started");
+            logger.LogInformation("Fuse Timer Manager Service started");
             return base.StartAsync(cancellationToken);
         }
 
@@ -42,11 +46,11 @@ namespace konlulu.BackgroundServices
                         {
                             using (IServiceScope scope = serviceScopeFactory.CreateScope())
                             {
-                                IGameDatabaseHandler gameDb = scope.ServiceProvider.GetRequiredService<IGameDatabaseHandler>();
+                                IGameRepository gameDb = scope.ServiceProvider.GetRequiredService<IGameRepository>();
                                 ObjectId gameId = new ObjectId(konluluTimer.gameId);
                                 GameEntity game = gameDb.Get(gameId);
                                 game.FuseCount++;
-                                Console.WriteLine($"{konluluTimer.gameId}:{game.FuseCount}");
+                                logger.LogInformation($"{konluluTimer.gameId}:{game.FuseCount}");
                                 if (game.FuseCount * 1000 < game.FuseTime)
                                 {
                                     gameDb.Save(game);
@@ -66,7 +70,7 @@ namespace konlulu.BackgroundServices
                                     PlayerEntity winner = null;
                                     string announcement = null;
 
-                                    IGamePlayerDatabaseHandler gepDb = scope.ServiceProvider.GetRequiredService<IGamePlayerDatabaseHandler>();
+                                    IGamePlayerRepository gepDb = scope.ServiceProvider.GetRequiredService<IGamePlayerRepository>();
                                     IOrderedEnumerable<GamePlayerEntity> playerOrderByOffer = gepDb.GetPlayerInGame(game.Id).OrderByDescending(gep => gep.Offer);
                                     GamePlayerEntity mostOffer = playerOrderByOffer.First();
                                     if (mostOffer.Player.Id.Equals(game.Holder.Id)
@@ -81,7 +85,7 @@ namespace konlulu.BackgroundServices
                                         announcement = $"Through dedication to the cause of the Debilulu Church, {winner.Mention} has emerged as a new man, blessed by the Queen of Yharnam herself";
                                     }
 
-                                    IPlayerDatabaseHandler playerDb = scope.ServiceProvider.GetRequiredService<IPlayerDatabaseHandler>();
+                                    IPlayerRepository playerDb = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
 
                                     // update stat
                                     winner.GameWin++;
@@ -100,20 +104,26 @@ namespace konlulu.BackgroundServices
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
-                        Console.WriteLine(ex.StackTrace);
+                        StringBuilder sb = new StringBuilder();
+                        sb.AppendLine("Exception when loading command modules");
+                        sb.AppendLine(ex.Message);
+                        sb.AppendLine(ex.StackTrace);
+                        logger.LogError(sb.ToString());
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
-                Console.WriteLine(ex.StackTrace);
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Exception when loading command modules");
+                sb.AppendLine(ex.Message);
+                sb.AppendLine(ex.StackTrace);
+                logger.LogError(sb.ToString());
             }
         }
         public override Task StopAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Fuse Timer Manager Service stopped");
+            logger.LogInformation("Fuse Timer Manager Service stopped");
             return base.StopAsync(cancellationToken);
         }
     }

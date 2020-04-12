@@ -5,6 +5,7 @@ using konlulu.DAL.Interfaces;
 using LiteDB;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,28 +13,34 @@ namespace konlulu.Modules
 {
     [Name("Administration and debug module")]
     [Summary("For when the game doesn't work as intended")]
+    [RequireRole("game_admin")]
     public class AdministrationModule : ModuleBase<SocketCommandContext>
     {
-        private readonly IGameDatabaseHandler gameDb;
-        private readonly IPlayerDatabaseHandler playerDb;
-        private readonly IGamePlayerDatabaseHandler gepDb;
+        private readonly IGameRepository gameDb;
+        private readonly IPlayerRepository playerDb;
+        private readonly IGamePlayerRepository gepDb;
+        private readonly IConfigRepository configDb;
 
-        public AdministrationModule(IGameDatabaseHandler gameDb, IPlayerDatabaseHandler playerDb, IGamePlayerDatabaseHandler gepDb)
+        public AdministrationModule(IGameRepository gameDb, IPlayerRepository playerDb, IGamePlayerRepository gepDb, IConfigRepository configDb)
         {
             this.gameDb = gameDb;
             this.playerDb = playerDb;
             this.gepDb = gepDb;
+            this.configDb = configDb;
         }
 
         [Command("admin.list")]
         [Summary("set a game's status to end")]
         public Task ListGameAsync()
         {
-            IEnumerable<GameEntity> games = gameDb.GetAll();
+            IEnumerable<GameEntity> games = gameDb.GetAll().OrderBy(g => g.StartTime);
             StringBuilder sb = new StringBuilder();
             foreach (GameEntity game in games)
             {
-                sb.AppendLine(game.ToString());
+                sb.AppendLine(game.Id.ToString());
+                sb.AppendLine(game.StartTime.ToString());
+                sb.AppendLine(game.GameStatus.ToString());
+                sb.AppendLine();
             }
             return ReplyAsync(sb.ToString());
         }
@@ -44,11 +51,14 @@ namespace konlulu.Modules
         {
             ObjectId gameId = new ObjectId(id);
             GameEntity game = gameDb.Get(gameId);
-            IEnumerable<GamePlayerEntity> gamePlayerEntities
-                = gepDb.Querry(gep => gep.Game.Id.Equals(gameId));
+            IEnumerable<GamePlayerEntity> gamePlayerEntities = gepDb.GetPlayerInGame(gameId);
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine(game.ToString());
-            sb.AppendLine("Player list:");
+            sb.AppendLine(game.Id.ToString());
+            sb.AppendLine(game.StartTime.ToString());
+            sb.AppendLine(game.GameStatus.ToString());
+            sb.AppendLine(game.Holder?.ToString());
+            sb.AppendLine("Occurring at: " + game.ChannelName?.ToString());
+            sb.AppendLine("Player list: " + gamePlayerEntities.Count());
             foreach (GamePlayerEntity gep in gamePlayerEntities)
             {
                 sb.AppendFormat("{0}: {1}", gep.JoinOrder, gep.Player.UserName);
@@ -80,6 +90,31 @@ namespace konlulu.Modules
             gameDb.Save(game);
 
             return ReplyAsync($"set game {gameId} to state init");
+        }
+
+
+        [Command("admin.config")]
+        [Summary("get a game's config")]
+        public Task ConfigAsync()
+        {
+            IEnumerable<ConfigEntity> configs = configDb.GetAll();
+
+            StringBuilder sb = new StringBuilder();
+            foreach (ConfigEntity config in configs)
+            {
+                sb.AppendLine(config.ToString());
+            }
+
+            return ReplyAsync(sb.ToString());
+        }
+
+        [Command("admin.config")]
+        [Summary("set a game's status to init")]
+        public Task ConfigAsync([Summary("config's name")] string config, [Summary("config's value")] int value)
+        {
+
+
+            return ReplyAsync($"set game to state init");
         }
     }
 }

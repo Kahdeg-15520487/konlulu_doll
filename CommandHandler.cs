@@ -1,5 +1,6 @@
 ﻿using Discord.Commands;
 using Discord.WebSocket;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -15,6 +16,7 @@ namespace konlulu
         private readonly DiscordSocketClient _client;
         private readonly CommandService _commands;
         private readonly IServiceProvider serviceProvider;
+        private readonly ILogger<CommandHandler> logger;
 
         // Retrieve client and CommandService instance via ctor
         public CommandHandler(DiscordSocketClient client, CommandService commands, IServiceProvider serviceProvider)
@@ -22,6 +24,7 @@ namespace konlulu
             _commands = commands;
             _client = client;
             this.serviceProvider = serviceProvider;
+            logger = this.serviceProvider.GetService(typeof(ILogger<CommandHandler>)) as ILogger<CommandHandler>;
         }
 
         public async Task InstallCommandsAsync()
@@ -39,18 +42,20 @@ namespace konlulu
             // See Dependency Injection guide for more information.
             IEnumerable<ModuleInfo> modules = await _commands.AddModulesAsync(assembly: Assembly.GetEntryAssembly(),
                                             services: this.serviceProvider);
-            Console.WriteLine("Discord Modules loaded:");
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Discord Modules loaded:");
             foreach (ModuleInfo module in modules)
             {
-                Console.WriteLine(module.Name);
-                Console.WriteLine(module.Summary);
-                Console.WriteLine("Commands: ");
+                sb.AppendLine(module.Name);
+                sb.AppendLine(module.Summary);
+                sb.AppendLine("Commands: ");
                 foreach (CommandInfo cmd in module.Commands)
                 {
-                    Console.WriteLine(cmd.Name);
-                    Console.WriteLine(cmd.Summary);
+                    sb.AppendLine(cmd.Name);
+                    sb.AppendLine(cmd.Summary);
                 }
             }
+            logger.LogInformation(sb.ToString());
         }
 
         private async Task HandleCommandAsync(SocketMessage messageParam)
@@ -70,7 +75,7 @@ namespace konlulu
 
             // Create a WebSocket-based command context based on the message
             SocketCommandContext context = new SocketCommandContext(_client, message);
-            Console.WriteLine(message.Content);
+            logger.LogInformation($"{message.Author.Id}|{message.Author.Username}: {message.Content}");
             // Execute the command with the command context we just
             // created, along with the service provider for precondition checks.
             await _commands.ExecuteAsync(

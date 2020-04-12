@@ -6,7 +6,9 @@ using konlulu.Modules;
 using LiteDB;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,15 +18,17 @@ namespace konlulu.BackgroundServices
     {
         private readonly IBackgroundTaskQueue<(RecurringTimer, ObjectId)> taskQueue;
         private readonly IServiceScopeFactory serviceScopeFactory;
+        private readonly ILogger<DiscordHandlerHostedService> logger;
 
-        public RecurringKonluluTimerHostedService(IBackgroundTaskQueue<(RecurringTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory)
+        public RecurringKonluluTimerHostedService(IBackgroundTaskQueue<(RecurringTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory, ILogger<DiscordHandlerHostedService> logger)
         {
             this.taskQueue = taskQueue;
             this.serviceScopeFactory = serviceScopeFactory;
+            this.logger = logger;
         }
         public override Task StartAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Kon Timer Manager Service started");
+            logger.LogInformation("Kon Timer Manager Service started");
             return base.StartAsync(cancellationToken);
         }
 
@@ -41,7 +45,7 @@ namespace konlulu.BackgroundServices
                         {
                             using (IServiceScope scope = serviceScopeFactory.CreateScope())
                             {
-                                IGameDatabaseHandler gameDb = scope.ServiceProvider.GetRequiredService<IGameDatabaseHandler>();
+                                IGameRepository gameDb = scope.ServiceProvider.GetRequiredService<IGameRepository>();
                                 DiscordSocketClient discordClient = scope.ServiceProvider.GetRequiredService<DiscordSocketClient>();
                                 ObjectId gameId = new ObjectId(konluluTimer.gameId);
                                 GameEntity game = gameDb.Get(gameId);
@@ -50,7 +54,7 @@ namespace konlulu.BackgroundServices
                                 {
                                     game.KonCount++;
                                     gameDb.Save(game);
-                                    Console.WriteLine($"{konluluTimer.gameId}:{game.KonCount}");
+                                    logger.LogInformation($"{konluluTimer.gameId}:{game.KonCount}");
                                     if (game.KonCount * 5000 <= game.FuseTime)
                                     {
                                         ISocketMessageChannel channel = discordClient.GetChannel(game.ChannelId) as ISocketMessageChannel;
@@ -63,20 +67,26 @@ namespace konlulu.BackgroundServices
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
-                        Console.WriteLine(ex.StackTrace);
+                        StringBuilder sb = new StringBuilder();
+                        sb.AppendLine("Exception when loading command modules");
+                        sb.AppendLine(ex.Message);
+                        sb.AppendLine(ex.StackTrace);
+                        logger.LogError(sb.ToString());
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
-                Console.WriteLine(ex.StackTrace);
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Exception when loading command modules");
+                sb.AppendLine(ex.Message);
+                sb.AppendLine(ex.StackTrace);
+                logger.LogError(sb.ToString());
             }
         }
         public override Task StopAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Kon Timer Manager Service stopped");
+            logger.LogInformation("Kon Timer Manager Service stopped");
             return base.StopAsync(cancellationToken);
         }
     }

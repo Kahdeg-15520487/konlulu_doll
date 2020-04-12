@@ -4,6 +4,7 @@ using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -16,11 +17,13 @@ namespace konlulu.BackgroundServices
     {
         private readonly IServiceProvider services;
         private readonly IConfiguration configuration;
+        private readonly ILogger<DiscordHandlerHostedService> logger;
 
-        public DiscordHandlerHostedService(IServiceProvider services, IConfiguration configuration)
+        public DiscordHandlerHostedService(IServiceProvider services, IConfiguration configuration, ILogger<DiscordHandlerHostedService> logger)
         {
             this.services = services;
             this.configuration = configuration;
+            this.logger = logger;
         }
 
         public override Task StartAsync(CancellationToken cancellationToken)
@@ -35,16 +38,31 @@ namespace konlulu.BackgroundServices
 
             string token = configuration["_BOTTOKEN"];
 
-            await client.LoginAsync(TokenType.Bot, token);
-            await client.StartAsync();
+            try
+            {
+                await client.LoginAsync(TokenType.Bot, token);
+                await client.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Exception when connecting with Discord");
+                sb.AppendLine(ex.Message);
+                sb.AppendLine(ex.StackTrace);
+                logger.LogError(sb.ToString());
+            }
+
             try
             {
                 await services.GetRequiredService<CommandHandler>().InstallCommandsAsync();
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
-                Console.WriteLine(ex.StackTrace);
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Exception when loading command modules");
+                sb.AppendLine(ex.Message);
+                sb.AppendLine(ex.StackTrace);
+                logger.LogError(sb.ToString());
             }
 
             //infinite wait
@@ -57,7 +75,7 @@ namespace konlulu.BackgroundServices
 
         private Task Log(LogMessage msg)
         {
-            Console.WriteLine(msg.ToString());
+            logger.LogInformation(msg.ToString());
             return Task.CompletedTask;
         }
     }
