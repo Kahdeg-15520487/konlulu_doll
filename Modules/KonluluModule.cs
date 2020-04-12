@@ -25,6 +25,7 @@ namespace konlulu.Modules
         public static readonly int MAX_FUSE_TIME = 40;
         public static readonly int MIN_FUSE_TIME = 30;
         public static readonly int MIN_PLAYER_COUNT = 3;
+        public static readonly int IS_DEBUG = 0;
 
         private readonly IGameRepository gameDb;
         private readonly IPlayerRepository playerDb;
@@ -56,6 +57,12 @@ namespace konlulu.Modules
         [Summary("Initiate a konlulu~ doll game")]
         public Task InitiateAsync()
         {
+            GameEntity initiatingGame = gameDb.GetInitiatingGame();
+            if (initiatingGame != null)
+            {
+                return base.ReplyAsync("A game is already initiating");
+            }
+
             GameEntity game = new GameEntity()
             {
                 StartTime = DateTime.Now,
@@ -63,9 +70,9 @@ namespace konlulu.Modules
                 ChannelId = this.Context.Channel.Id,
                 ChannelName = this.Context.Channel.Name
             };
-            LiteDB.ObjectId gameId = gameDb.Save(game);
+            ObjectId gameId = gameDb.Save(game);
             logger.LogInformation(gameId.ToString());
-            return base.ReplyAsync($"init game {gameId.ToString()} on channel {game.ChannelName}");
+            return base.ReplyAsync($"Init game {gameId.ToString()} on channel {game.ChannelName}");
         }
 
         [Command("reg")]
@@ -102,7 +109,12 @@ namespace konlulu.Modules
             game.PlayerCount++;
             gameDb.Save(game);
 
-            return base.ReplyAsync($"registered player {player.Mention} to game {game.Id}");
+            if (configDb.GetConfigByName(nameof(IS_DEBUG)).ConfigValue == 1)
+            {
+                return base.ReplyAsync($"Registered player {player.Mention} to game {game.Id}");
+            }
+
+            return base.ReplyAsync($"Registered player {player.Mention} to the initating game");
         }
 
         [Command("start")]
@@ -142,15 +154,21 @@ namespace konlulu.Modules
 
             recurringTimerQueue.QueueBackgroundWorkItem((c) => RecurringTimer(c, game));
             fuseTimerQueue.QueueBackgroundWorkItem((c) => FuseTimer(c, game));
-            return base.ReplyAsync($"started game {game.Id}");
+
+            if (configDb.GetConfigByName(nameof(IS_DEBUG)).ConfigValue == 1)
+            {
+                return base.ReplyAsync($"Started game {game.Id}, doll has been given to {game.Holder.Mention}");
+            }
+
+            return base.ReplyAsync($"Game Started, doll has been given to {game.Holder.Mention}");
         }
 
         [Command("pass")]
         [Summary("Pass the konlulu~ doll")]
         public Task PassAsync()
         {
-            PlayerEntity holder = this.GetPlayerFromContext();
-            GameEntity game = this.GetGameFromPlayer(holder);
+            PlayerEntity player = this.GetPlayerFromContext();
+            GameEntity game = this.GetGameFromPlayer(player);
             if (game == null)
             {
                 return Task.CompletedTask;
@@ -159,14 +177,18 @@ namespace konlulu.Modules
             {
                 return ReplyAsync($"Wrong channel, please turn back to channel {game.ChannelName}");
             }
+            if (!game.Holder.Id.Equals(player.Id))
+            {
+                return ReplyAsync($"You are not the holder {player.Mention}");
+            }
 
-            PlayerEntity nextPlayer = this.GetNextPlayerInGame(game, holder);
+            PlayerEntity nextPlayer = this.GetNextPlayerInGame(game, player);
 
             game.Holder = nextPlayer;
             gameDb.Save(game);
 
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"{holder.Mention} passed the doll to {nextPlayer.Mention}");
+            sb.AppendLine($"{player.Mention} passed the doll to {nextPlayer.Mention}");
             sb.AppendLine($"{nextPlayer.Mention} is now the holder");
 
             return base.ReplyAsync(sb.ToString());
@@ -176,8 +198,8 @@ namespace konlulu.Modules
         [Summary("Offer to the konlulu~ doll")]
         public Task OfferAsync([Summary("amount of offer")]int offer)
         {
-            PlayerEntity holder = this.GetPlayerFromContext();
-            GameEntity game = this.GetGameFromPlayer(holder);
+            PlayerEntity player = this.GetPlayerFromContext();
+            GameEntity game = this.GetGameFromPlayer(player);
             if (game == null)
             {
                 return Task.CompletedTask;
@@ -186,8 +208,12 @@ namespace konlulu.Modules
             {
                 return ReplyAsync($"Wrong channel, please turn back to channel {game.ChannelName}");
             }
+            if (!game.Holder.Id.Equals(player.Id))
+            {
+                return ReplyAsync($"You are not the holder {player.Mention}");
+            }
 
-            GamePlayerEntity gep = this.GetGEPFromPlayerAndGame(holder, game);
+            GamePlayerEntity gep = this.GetGEPFromPlayerAndGame(player, game);
 
             TimeSpan timeSinceLastOffer = (DateTime.Now - gep.LastOffer);
             int offerCooldown = configDb.GetConfigByName(nameof(OFFER_COOLDOWN)).ConfigValue;
@@ -202,16 +228,17 @@ namespace konlulu.Modules
             }
 
             // calculate offer
-            int calculatedOffer = offer / 2 + 1;
-            calculatedOffer = calculatedOffer > 5 ? 5 : calculatedOffer;
-            game.FuseTime += calculatedOffer;
+            //int calculatedOffer = offer / 2 + 1;
+            //calculatedOffer = calculatedOffer > 5 ? 5 : calculatedOffer == 2?;
+            //game.FuseTime += calculatedOffer;
+            game.FuseTime += offer;
             gameDb.Save(game);
 
             gep.Offer += offer;
             gep.LastOffer = DateTime.Now;
             gepDb.Save(gep);
 
-            return base.ReplyAsync($"{holder.Mention} offered {offer} to speed up the fuse by {calculatedOffer} seconds");
+            return base.ReplyAsync($"{player.Mention} has offered and sped up the fuse by {offer} seconds");
         }
 
         private GamePlayerEntity GetGEPFromPlayerAndGame(PlayerEntity holder, GameEntity game)

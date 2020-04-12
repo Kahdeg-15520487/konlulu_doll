@@ -110,6 +110,7 @@ namespace konlulu
                 ConfigEntity MIN_FUSE_TIME_config = new ConfigEntity(nameof(KonluluModule.MIN_FUSE_TIME), KonluluModule.MIN_FUSE_TIME);
                 ConfigEntity MAX_OFFER_config = new ConfigEntity(nameof(KonluluModule.MAX_OFFER), KonluluModule.MAX_OFFER);
                 ConfigEntity MIN_PLAYER_COUNT_config = new ConfigEntity(nameof(KonluluModule.MIN_PLAYER_COUNT), KonluluModule.MIN_PLAYER_COUNT);
+                ConfigEntity IS_DEBUG_config = new ConfigEntity(nameof(KonluluModule.IS_DEBUG), KonluluModule.IS_DEBUG);
 
                 configDb.SaveWithoutUpdate(OFFER_COOLDOWN_config);
                 configDb.SaveWithoutUpdate(KON_TIME_config);
@@ -117,6 +118,7 @@ namespace konlulu
                 configDb.SaveWithoutUpdate(MIN_FUSE_TIME_config);
                 configDb.SaveWithoutUpdate(MAX_OFFER_config);
                 configDb.SaveWithoutUpdate(MIN_PLAYER_COUNT_config);
+                configDb.SaveWithoutUpdate(IS_DEBUG_config);
 
                 //seed flavor text
 

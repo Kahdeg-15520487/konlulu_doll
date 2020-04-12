@@ -51,9 +51,10 @@ namespace konlulu
                 sb.AppendLine("Commands: ");
                 foreach (CommandInfo cmd in module.Commands)
                 {
-                    sb.AppendLine(cmd.Name);
-                    sb.AppendLine(cmd.Summary);
+                    sb.AppendLine("    " + cmd.Name);
+                    sb.AppendLine("    " + cmd.Summary);
                 }
+                sb.AppendLine("-----");
             }
             logger.LogInformation(sb.ToString());
         }
