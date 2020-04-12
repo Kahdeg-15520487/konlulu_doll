@@ -67,6 +67,7 @@ namespace konlulu
                     .AddTransient<IPlayerRepository, PlayerRepository>()
                     .AddTransient<IGamePlayerRepository, GamePlayerRepository>()
                     .AddTransient<IConfigRepository, ConfigRepository>()
+                    .AddTransient<IFlavorTextRepository, FlavorTextRepository>()
 
                     .AddSingleton(typeof(IBackgroundTaskQueue<>), typeof(BackgroundTaskQueue<>))
                     .AddHostedService<DiscordHandlerHostedService>()
