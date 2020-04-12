@@ -109,12 +109,18 @@ namespace konlulu.Modules
         }
 
         [Command("admin.config")]
-        [Summary("set a game's status to init")]
-        public Task ConfigAsync([Summary("config's name")] string config, [Summary("config's value")] int value)
+        [Summary("modify a game's config")]
+        public Task ConfigAsync([Summary("config's name")] string configName, [Summary("config's value")] int value)
         {
+            ConfigEntity config = configDb.GetConfigByName(configName);
+            if (config == null)
+            {
+                return ReplyAsync($"there are no config named {configName}");
+            }
+            config.ConfigValue = value;
+            configDb.Save(config);
 
-
-            return ReplyAsync($"set game to state init");
+            return ReplyAsync($"modified config {configName}");
         }
     }
 }

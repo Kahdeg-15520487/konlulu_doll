@@ -18,9 +18,9 @@ namespace konlulu.BackgroundServices
     {
         private readonly IBackgroundTaskQueue<(RecurringTimer, ObjectId)> taskQueue;
         private readonly IServiceScopeFactory serviceScopeFactory;
-        private readonly ILogger<DiscordHandlerHostedService> logger;
+        private readonly ILogger<RecurringKonluluTimerHostedService> logger;
 
-        public RecurringKonluluTimerHostedService(IBackgroundTaskQueue<(RecurringTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory, ILogger<DiscordHandlerHostedService> logger)
+        public RecurringKonluluTimerHostedService(IBackgroundTaskQueue<(RecurringTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory, ILogger<RecurringKonluluTimerHostedService> logger)
         {
             this.taskQueue = taskQueue;
             this.serviceScopeFactory = serviceScopeFactory;
@@ -54,7 +54,7 @@ namespace konlulu.BackgroundServices
                                 {
                                     game.KonCount++;
                                     gameDb.Save(game);
-                                    logger.LogInformation($"{konluluTimer.gameId}:{game.KonCount}");
+                                    logger.LogInformation($"kon:{konluluTimer.gameId}:{game.KonCount}");
                                     if (game.KonCount * 5000 <= game.FuseTime)
                                     {
                                         ISocketMessageChannel channel = discordClient.GetChannel(game.ChannelId) as ISocketMessageChannel;

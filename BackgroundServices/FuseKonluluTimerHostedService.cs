@@ -19,9 +19,9 @@ namespace konlulu.BackgroundServices
     {
         private readonly IBackgroundTaskQueue<(FuseTimer, ObjectId)> taskQueue;
         private readonly IServiceScopeFactory serviceScopeFactory;
-        private readonly ILogger<DiscordHandlerHostedService> logger;
+        private readonly ILogger<RecurringKonluluTimerHostedService> logger;
 
-        public FuseKonluluTimerHostedService(IBackgroundTaskQueue<(FuseTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory, ILogger<DiscordHandlerHostedService> logger)
+        public FuseKonluluTimerHostedService(IBackgroundTaskQueue<(FuseTimer, ObjectId)> taskQueue, IServiceScopeFactory serviceScopeFactory, ILogger<RecurringKonluluTimerHostedService> logger)
         {
             this.taskQueue = taskQueue;
             this.serviceScopeFactory = serviceScopeFactory;
@@ -50,7 +50,7 @@ namespace konlulu.BackgroundServices
                                 ObjectId gameId = new ObjectId(konluluTimer.gameId);
                                 GameEntity game = gameDb.Get(gameId);
                                 game.FuseCount++;
-                                logger.LogInformation($"{konluluTimer.gameId}:{game.FuseCount}");
+                                logger.LogInformation($"fuse:{konluluTimer.gameId}:{game.FuseCount}");
                                 if (game.FuseCount * 1000 < game.FuseTime)
                                 {
                                     gameDb.Save(game);

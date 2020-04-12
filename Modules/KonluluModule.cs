@@ -97,8 +97,10 @@ namespace konlulu.Modules
                 Offer = 0,
                 LastOffer = DateTime.Now
             };
-
             gepDb.Save(gep);
+
+            game.PlayerCount++;
+            gameDb.Save(game);
 
             return base.ReplyAsync($"registered player {player.Mention} to game {game.Id}");
         }
@@ -118,8 +120,9 @@ namespace konlulu.Modules
             }
 
             game.PlayerCount = gepDb.GetPlayerInGame(game.Id).Count();
-            if (game.PlayerCount <= configDb.GetConfigByName(nameof(MIN_PLAYER_COUNT)).ConfigValue)
+            if (game.PlayerCount < configDb.GetConfigByName(nameof(MIN_PLAYER_COUNT)).ConfigValue)
             {
+                logger.LogInformation($"game.PlayerCount: " + game.PlayerCount);
                 return base.ReplyAsync("There is not enough player to start the game!");
             }
 
