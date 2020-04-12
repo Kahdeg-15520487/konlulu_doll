@@ -153,7 +153,7 @@ namespace konlulu.Modules
             GameEntity game = this.GetGameFromPlayer(holder);
             if (game == null)
             {
-                return base.ReplyAsync("There is no game that is playing!");
+                return Task.CompletedTask;
             }
             if (game.ChannelId != Context.Channel.Id)
             {
@@ -165,7 +165,11 @@ namespace konlulu.Modules
             game.Holder = nextPlayer;
             gameDb.Save(game);
 
-            return base.ReplyAsync($"{holder.Mention} passed the doll to {nextPlayer.Mention}");
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine($"{holder.Mention} passed the doll to {nextPlayer.Mention}");
+            sb.AppendLine($"{nextPlayer.Mention} is now the holder");
+
+            return base.ReplyAsync(sb.ToString());
         }
 
         [Command("offer")]
@@ -176,7 +180,7 @@ namespace konlulu.Modules
             GameEntity game = this.GetGameFromPlayer(holder);
             if (game == null)
             {
-                return base.ReplyAsync("There is no game that is playing!");
+                return Task.CompletedTask;
             }
             if (game.ChannelId != Context.Channel.Id)
             {
@@ -207,7 +211,7 @@ namespace konlulu.Modules
             gep.LastOffer = DateTime.Now;
             gepDb.Save(gep);
 
-            return base.ReplyAsync($"{holder.Mention} offered {offer}");
+            return base.ReplyAsync($"{holder.Mention} offered {offer} to speed up the fuse by {calculatedOffer} seconds");
         }
 
         private GamePlayerEntity GetGEPFromPlayerAndGame(PlayerEntity holder, GameEntity game)

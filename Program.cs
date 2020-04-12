@@ -56,10 +56,10 @@ namespace konlulu
             InitDatabase(configuration);
 
             services.AddSingleton<IConfiguration>(configuration)
+                    .AddHttpClient()
                     .AddSingleton<DiscordSocketClient>()
                     .AddSingleton<CommandService>()
                     .AddSingleton<CommandHandler>()
-                    .AddSingleton<HttpClient>()
 
                     .AddSingleton<ILiteDatabase>(new LiteDatabase(configuration["_CONNSTR"]))
                     .AddTransient(typeof(IBaseRepository<>), typeof(BaseRepository<>))
@@ -97,9 +97,10 @@ namespace konlulu
                   .DbRef(x => x.Player, nameof(PlayerEntity))
                   .DbRef(x => x.Game, nameof(GameEntity));
 
-            //seed config
+            //seed database
             using (LiteDatabase db = new LiteDatabase(configuration["_CONNSTR"]))
             {
+                //seed config
                 ConfigRepository configDb = new ConfigRepository(db);
 
                 ConfigEntity OFFER_COOLDOWN_config = new ConfigEntity(nameof(KonluluModule.OFFER_COOLDOWN), KonluluModule.OFFER_COOLDOWN);
@@ -115,6 +116,9 @@ namespace konlulu
                 configDb.SaveWithoutUpdate(MIN_FUSE_TIME_config);
                 configDb.SaveWithoutUpdate(MAX_OFFER_config);
                 configDb.SaveWithoutUpdate(MIN_PLAYER_COUNT_config);
+
+                //seed flavor text
+
             }
         }
     }

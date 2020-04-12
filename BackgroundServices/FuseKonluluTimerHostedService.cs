@@ -51,6 +51,7 @@ namespace konlulu.BackgroundServices
                                 GameEntity game = gameDb.Get(gameId);
                                 game.FuseCount++;
                                 logger.LogInformation($"fuse:{konluluTimer.gameId}:{game.FuseCount}");
+
                                 if (game.FuseCount * 1000 < game.FuseTime)
                                 {
                                     gameDb.Save(game);
@@ -59,35 +60,49 @@ namespace konlulu.BackgroundServices
                                 else
                                 {
                                     DiscordSocketClient discordClient = scope.ServiceProvider.GetRequiredService<DiscordSocketClient>();
+                                    IGamePlayerRepository gepDb = scope.ServiceProvider.GetRequiredService<IGamePlayerRepository>();
+                                    IFlavorTextRepository ftDb = scope.ServiceProvider.GetRequiredService<IFlavorTextRepository>();
+
+                                    //get the channel that the game is occurring in
                                     ISocketMessageChannel channel = discordClient.GetChannel(game.ChannelId) as ISocketMessageChannel;
 
-                                    //Do your stuff
+                                    //end the game
                                     game.GameStatus = GameStatus.Ended;
                                     gameDb.Save(game);
                                     await channel.SendMessageAsync("Boom!");
-                                    //announce winner
 
+                                    //fetch flavor text
+                                    //todo add flavor text
+
+                                    //select winner
                                     PlayerEntity winner = null;
                                     string announcement = null;
 
-                                    IGamePlayerRepository gepDb = scope.ServiceProvider.GetRequiredService<IGamePlayerRepository>();
+                                    //get the player who offer most
                                     IOrderedEnumerable<GamePlayerEntity> playerOrderByOffer = gepDb.GetPlayerInGame(game.Id).OrderByDescending(gep => gep.Offer);
                                     GamePlayerEntity mostOffer = playerOrderByOffer.First();
+
+                                    //check for mostoffer player's win condition
                                     if (mostOffer.Player.Id.Equals(game.Holder.Id)
-                                        && game.PlayerCount >= 3)
+                                        && game.PlayerCount > 1)
                                     {
+                                        //runner up win
                                         winner = playerOrderByOffer.ElementAt(1).Player;
-                                        announcement = $"Although {mostOffer.Player.Mention} has offered most of his soul to KonLulu~ he got exploded due to his greed and thus {winner.Mention} is the final Winner";
+                                        announcement = string.Format("Although {0} has offered most of his soul to KonLulu~ he got exploded due to his greed and thus {1} is the final Winner", mostOffer.Player.Mention, winner.Mention);
                                     }
                                     else
                                     {
+                                        //mostoffer win
                                         winner = mostOffer.Player;
-                                        announcement = $"Through dedication to the cause of the Debilulu Church, {winner.Mention} has emerged as a new man, blessed by the Queen of Yharnam herself";
+                                        announcement = string.Format("Through dedication to the cause of the Debilulu Church, {0} has emerged as a new man, blessed by the Queen of Yharnam herself while the rest perish", winner.Mention);
                                     }
 
+                                    //announce winner
+                                    await channel.SendMessageAsync(announcement);
+
+                                    // update player's stat
                                     IPlayerRepository playerDb = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
 
-                                    // update stat
                                     winner.GameWin++;
                                     foreach (GamePlayerEntity gep in playerOrderByOffer)
                                     {
@@ -96,8 +111,6 @@ namespace konlulu.BackgroundServices
                                         player.TotalOffer += gep.Offer;
                                         playerDb.Save(player);
                                     }
-
-                                    await channel.SendMessageAsync(announcement);
                                 }
                             }
                         }
