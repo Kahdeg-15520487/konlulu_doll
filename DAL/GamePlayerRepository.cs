@@ -1,6 +1,7 @@
 ﻿using konlulu.DAL.Entity;
 using konlulu.DAL.Interfaces;
 using LiteDB;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +11,13 @@ namespace konlulu.DAL
 {
     public class GamePlayerRepository : BaseRepository<GamePlayerEntity>, IGamePlayerRepository
     {
-        public GamePlayerRepository(ILiteDatabase db) : base(db) { }
+        private readonly ILogger<GamePlayerRepository> logger;
+
+        public GamePlayerRepository(ILiteDatabase db, ILogger<GamePlayerRepository> logger) : base(db)
+        {
+            this.logger = logger;
+
+        }
 
         public override IEnumerable<GamePlayerEntity> Querry(Expression<Func<GamePlayerEntity, bool>> predicate)
         {
@@ -36,7 +43,7 @@ namespace konlulu.DAL
             IEnumerable<GamePlayerEntity> querry = db.GetCollection<GamePlayerEntity>()
                                                      .Include(gep => gep.Player)
                                                      .Include(gep => gep.Game)
-                                                     .Find(gep => gep.Player.Id.Equals(gameId))
+                                                     .Find(gep => gep.Game.Id.Equals(gameId))
                                                      .OrderBy(gep => gep.JoinOrder);
             GamePlayerEntity last = querry.LastOrDefault();
             if (last == null)

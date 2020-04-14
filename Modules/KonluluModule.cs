@@ -179,6 +179,8 @@ namespace konlulu.Modules
             }
             if (!game.Holder.Id.Equals(player.Id))
             {
+                logger.LogInformation(game.Holder.Id + ":" + game.Holder.UserName);
+                logger.LogInformation(player.Id + ":" + player.UserName);
                 return ReplyAsync($"You are not the holder {player.Mention}");
             }
 
