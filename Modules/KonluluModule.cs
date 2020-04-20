@@ -50,6 +50,12 @@ namespace konlulu.Modules
 
         protected override void BeforeExecute(CommandInfo command)
         {
+            PlayerEntity player = this.GetPlayerFromContext();
+            if (player == null)
+            {
+                this.CreateUser();
+            }
+
             base.BeforeExecute(command);
         }
 
@@ -57,10 +63,18 @@ namespace konlulu.Modules
         [Summary("Initiate a konlulu~ doll game")]
         public Task InitiateAsync()
         {
-            GameEntity initiatingGame = gameDb.GetInitiatingGame();
+            GameEntity initiatingGame = this.GetInitiatingGame(this.Context.Channel.Id);
             if (initiatingGame != null)
             {
-                return base.ReplyAsync("A game is already initiating");
+                logger.LogError(DateTime.Now.ToShortTimeString() + " A game is already initiating in channel {0}|{1}", this.Context.Channel.Id, this.Context.Channel.Name);
+                return base.ReplyAsync($"A game is already initiating in channel {this.Context.Channel.Name}");
+            }
+
+            GameEntity playingGame = this.GetPlayingGame(this.Context.Channel.Id);
+            if (playingGame != null)
+            {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " A game is already playing in channel {0}|{1}", this.Context.Channel.Id, this.Context.Channel.Name);
+                return base.ReplyAsync($"A game is already playing in channel {this.Context.Channel.Name}");
             }
 
             GameEntity game = new GameEntity()
@@ -71,7 +85,11 @@ namespace konlulu.Modules
                 ChannelName = this.Context.Channel.Name
             };
             ObjectId gameId = gameDb.Save(game);
-            logger.LogInformation(gameId.ToString());
+
+            PlayerEntity player = this.GetPlayerFromContext();
+
+            logger.LogInformation(DateTime.Now.ToShortTimeString() + " Player {0}|{1} successfully initated game {2} in channel {3}|{4}", player.Id, player.UserName, game.Id, game.ChannelId, game.ChannelName);
+
             return base.ReplyAsync($"Init game {gameId.ToString()} on channel {game.ChannelName}");
         }
 
@@ -79,20 +97,18 @@ namespace konlulu.Modules
         [Summary("Participate in a konlulu~ doll game")]
         public Task RegisterAsync()
         {
-            GameEntity game = gameDb.GetInitiatingGame();
+            GameEntity game = this.GetInitiatingGame(this.Context.Channel.Id);
             if (game == null)
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " No game is initiating in channel {0}|{1}", this.Context.Channel.Id, this.Context.Channel.Name);
                 return ReplyAsync("There is no game that is initiating!");
-            }
-            if (game.ChannelId != Context.Channel.Id)
-            {
-                return ReplyAsync($"Wrong channel, please turn back to channel {game.ChannelName}");
             }
 
             PlayerEntity player = GetPlayerFromContext();
-            if (player == null)
+            if (game.ChannelId != Context.Channel.Id)
             {
-                player = CreateUser();
+                logger.LogError(DateTime.Now.ToShortTimeString() + " Player {0}|{1} register in channel {2}|{3} instead of {4}|{5}", player.Id, player.UserName, this.Context.Channel.Id, this.Context.Channel.Name, game.ChannelId, game.ChannelName);
+                return ReplyAsync($"Wrong channel, please turn back to channel {game.ChannelName}");
             }
 
             GamePlayerEntity gep = new GamePlayerEntity()
@@ -109,6 +125,8 @@ namespace konlulu.Modules
             game.PlayerCount++;
             gameDb.Save(game);
 
+            logger.LogInformation(DateTime.Now.ToShortTimeString() + " player {0}|{1} register successfully into game {2} in channel {3}|{4}", player.Id, player.UserName, game.Id, game.ChannelId, game.ChannelName);
+
             if (configDb.GetConfigByName(nameof(IS_DEBUG)).ConfigValue == 1)
             {
                 return base.ReplyAsync($"Registered player {player.Mention} to game {game.Id}");
@@ -121,20 +139,24 @@ namespace konlulu.Modules
         [Summary("Start a konlulu~ doll game")]
         public Task StartAsync()
         {
-            GameEntity game = gameDb.GetInitiatingGame();
+            GameEntity game = this.GetInitiatingGame(this.Context.Channel.Id);
             if (game == null)
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " No game is initiating in channel {0}|{1}", this.Context.Channel.Id, this.Context.Channel.Name);
                 return base.ReplyAsync("There is no game that is initiating!");
             }
+            PlayerEntity player = this.GetPlayerFromContext();
             if (game.ChannelId != Context.Channel.Id)
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " Player {0}|{1} start game in channel {2}|{3} instead of {4}|{5}", player.Id, player.UserName, this.Context.Channel.Id, this.Context.Channel.Name, game.ChannelId, game.ChannelName);
                 return ReplyAsync($"Wrong channel, please turn back to channel {game.ChannelName}");
             }
 
             game.PlayerCount = gepDb.GetPlayerInGame(game.Id).Count();
-            if (game.PlayerCount < configDb.GetConfigByName(nameof(MIN_PLAYER_COUNT)).ConfigValue)
+            int minPlayerCount = configDb.GetConfigByName(nameof(MIN_PLAYER_COUNT)).ConfigValue;
+            if (game.PlayerCount < minPlayerCount)
             {
-                logger.LogInformation($"game.PlayerCount: " + game.PlayerCount);
+                logger.LogError("game.PlayerCount: {0} is not enough to start the game, minimum player count is {1}", game.PlayerCount, minPlayerCount);
                 return base.ReplyAsync("There is not enough player to start the game!");
             }
 
@@ -150,10 +172,12 @@ namespace konlulu.Modules
             game.PlayerCount = gepDb.GetPlayerInGame(game.Id).Count();
             gameDb.Save(game);
 
-            logger.LogInformation("game.FuseTime:" + game.FuseTime.ToString());
+            logger.LogInformation(DateTime.Now.ToShortTimeString() + " game.FuseTime:" + game.FuseTime.ToString());
 
             recurringTimerQueue.QueueBackgroundWorkItem((c) => RecurringTimer(c, game));
             fuseTimerQueue.QueueBackgroundWorkItem((c) => FuseTimer(c, game));
+
+            logger.LogInformation(DateTime.Now.ToShortTimeString() + " Player {0}|{1} successfully start a game {2} in channel {3}|{4}", player.Id, player.UserName, game.Id, game.ChannelId, game.ChannelName);
 
             if (configDb.GetConfigByName(nameof(IS_DEBUG)).ConfigValue == 1)
             {
@@ -168,19 +192,21 @@ namespace konlulu.Modules
         public Task PassAsync()
         {
             PlayerEntity player = this.GetPlayerFromContext();
-            GameEntity game = this.GetGameFromPlayer(player);
+            GameEntity game = this.GetPlayingGame(this.Context.Channel.Id);
             if (game == null)
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " No game is currentlyplaying in channel {0}|{1}", this.Context.Channel.Id, this.Context.Channel.Name);
                 return Task.CompletedTask;
             }
             if (game.ChannelId != Context.Channel.Id)
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " Player {0}|{1} pass doll in channel {2}|{3} instead of {4}|{5}", player.Id, player.UserName, this.Context.Channel.Id, this.Context.Channel.Name, game.ChannelId, game.ChannelName);
                 return ReplyAsync($"Wrong channel, please turn back to channel {game.ChannelName}");
             }
             if (!game.Holder.Id.Equals(player.Id))
             {
-                logger.LogInformation(game.Holder.Id + ":" + game.Holder.UserName);
-                logger.LogInformation(player.Id + ":" + player.UserName);
+                logger.LogInformation(DateTime.Now.ToShortTimeString() + game.Holder.Id + ":" + game.Holder.UserName);
+                logger.LogInformation(DateTime.Now.ToShortTimeString() + player.Id + ":" + player.UserName);
                 return ReplyAsync($"You are not the holder {player.Mention}");
             }
 
@@ -201,17 +227,20 @@ namespace konlulu.Modules
         public Task OfferAsync([Summary("amount of offer")]int offer)
         {
             PlayerEntity player = this.GetPlayerFromContext();
-            GameEntity game = this.GetGameFromPlayer(player);
+            GameEntity game = this.GetPlayingGame(this.Context.Channel.Id);
             if (game == null)
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + "No game is currentlyplaying in channel {0}|{1}", this.Context.Channel.Id, this.Context.Channel.Name);
                 return Task.CompletedTask;
             }
             if (game.ChannelId != Context.Channel.Id)
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " Player {0}|{1} offer in channel {2}|{3} instead of {4}|{5}", player.Id, player.UserName, this.Context.Channel.Id, this.Context.Channel.Name, game.ChannelId, game.ChannelName);
                 return ReplyAsync($"Wrong channel, please turn back to channel {game.ChannelName}");
             }
             if (!game.Holder.Id.Equals(player.Id))
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " Player {0}|{1} is not the holder in game {2} in channel {3}|{4}", player.Id, player.UserName, game.Id, game.ChannelId, game.ChannelName);
                 return ReplyAsync($"You are not the holder {player.Mention}");
             }
 
@@ -221,6 +250,7 @@ namespace konlulu.Modules
             int offerCooldown = configDb.GetConfigByName(nameof(OFFER_COOLDOWN)).ConfigValue;
             if (timeSinceLastOffer.TotalSeconds <= offerCooldown)
             {
+                logger.LogError(DateTime.Now.ToShortTimeString() + " Player {0}|{1} offer while still on cool down {2}", player.Id, player.UserName, offerCooldown - timeSinceLastOffer.TotalSeconds);
                 return ReplyAsync($"You can't offer that fast, please wait {offerCooldown - timeSinceLastOffer.TotalSeconds}");
             }
 
@@ -240,7 +270,21 @@ namespace konlulu.Modules
             gep.LastOffer = DateTime.Now;
             gepDb.Save(gep);
 
+            logger.LogInformation(DateTime.Now.ToShortTimeString() + " Player {0}|{1} offered {2} in game {3} in channel {4}|{5}", player.Id, player.UserName, offer, game.Id, game.ChannelId, game.ChannelName);
+
             return base.ReplyAsync($"{player.Mention} has offered and sped up the fuse by {offer} seconds");
+        }
+
+        #region helper methods
+
+        private GameEntity GetPlayingGame(ulong channelId)
+        {
+            return gameDb.Querry(g => g.GameStatus == GameStatus.Playing && g.ChannelId == channelId).FirstOrDefault();
+        }
+
+        private GameEntity GetInitiatingGame(ulong channelId)
+        {
+            return gameDb.Querry(g => g.GameStatus == GameStatus.Initiating && g.ChannelId == channelId).FirstOrDefault();
         }
 
         private GamePlayerEntity GetGEPFromPlayerAndGame(PlayerEntity holder, GameEntity game)
@@ -321,5 +365,6 @@ namespace konlulu.Modules
                 return (new FuseTimer(), game.Id);
             });
         }
+        #endregion
     }
 }

@@ -50,7 +50,7 @@ namespace konlulu.BackgroundServices
                                 ObjectId gameId = new ObjectId(konluluTimer.gameId);
                                 GameEntity game = gameDb.Get(gameId);
                                 game.FuseCount++;
-                                logger.LogInformation($"fuse:{konluluTimer.gameId}:{game.FuseCount}");
+                                logger.LogInformation(DateTime.Now.ToShortTimeString() + $" fuse:{konluluTimer.gameId}:{game.FuseCount}");
 
                                 if (game.FuseCount * 1000 < game.FuseTime)
                                 {

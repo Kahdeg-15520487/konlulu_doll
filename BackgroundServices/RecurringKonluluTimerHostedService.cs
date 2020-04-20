@@ -54,7 +54,7 @@ namespace konlulu.BackgroundServices
                                 {
                                     game.KonCount++;
                                     gameDb.Save(game);
-                                    logger.LogInformation($"kon:{konluluTimer.gameId}:{game.KonCount}");
+                                    logger.LogInformation(DateTime.Now.ToShortTimeString() + $" kon:{konluluTimer.gameId}:{game.KonCount}");
                                     if (game.KonCount * 5000 <= game.FuseTime)
                                     {
                                         ISocketMessageChannel channel = discordClient.GetChannel(game.ChannelId) as ISocketMessageChannel;
