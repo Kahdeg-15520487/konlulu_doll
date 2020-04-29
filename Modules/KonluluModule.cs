@@ -36,6 +36,8 @@ namespace konlulu.Modules
         private readonly IBackgroundTaskQueue<(FuseTimer, ObjectId)> fuseTimerQueue;
         private readonly ILogger<KonluluModule> logger;
 
+        public static string HELP_STRING { get; internal set; }
+
         public KonluluModule(IGameRepository gameDb, IPlayerRepository playerDb, IGamePlayerRepository gepDb, IConfigRepository configDb, Random random, IBackgroundTaskQueue<(RecurringTimer, ObjectId)> recurringTimerQueue, IBackgroundTaskQueue<(FuseTimer, ObjectId)> fuseTimerQueue, ILogger<KonluluModule> logger)
         {
             this.gameDb = gameDb;
@@ -57,6 +59,13 @@ namespace konlulu.Modules
             }
 
             base.BeforeExecute(command);
+        }
+
+        [Command("help")]
+        [Summary("Get help")]
+        public Task PrintHelpAsync()
+        {
+            return base.ReplyAsync(KonluluModule.HELP_STRING);
         }
 
         [Command("init")]

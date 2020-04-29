@@ -1,5 +1,6 @@
 ﻿using Discord.Commands;
 using Discord.WebSocket;
+using konlulu.Modules;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -44,6 +45,7 @@ namespace konlulu
                                             services: this.serviceProvider);
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("Discord Modules loaded:");
+            StringBuilder help = new StringBuilder();
             foreach (ModuleInfo module in modules)
             {
                 sb.AppendLine(module.Name);
@@ -55,6 +57,19 @@ namespace konlulu
                     sb.AppendLine("    " + cmd.Summary);
                 }
                 sb.AppendLine("-----");
+
+                if (module.Name == "konlulu")
+                {
+                    help.AppendLine(module.Name);
+                    help.AppendLine(module.Summary);
+                    help.AppendLine("Commands: ");
+                    foreach (CommandInfo cmd in module.Commands)
+                    {
+                        help.AppendLine("    " + cmd.Name);
+                        help.AppendLine("    " + cmd.Summary);
+                    }
+                }
+                KonluluModule.HELP_STRING = help.ToString();
             }
             logger.LogInformation(sb.ToString());
         }
