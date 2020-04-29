@@ -58,16 +58,17 @@ namespace konlulu
                 }
                 sb.AppendLine("-----");
 
-                if (module.Name == "konlulu")
+                if (module.Name == "KonLulu~")
                 {
+                    help.AppendLine("```");
                     help.AppendLine(module.Name);
                     help.AppendLine(module.Summary);
                     help.AppendLine("Commands: ");
                     foreach (CommandInfo cmd in module.Commands)
                     {
-                        help.AppendLine("    " + cmd.Name);
-                        help.AppendLine("    " + cmd.Summary);
+                        help.AppendLine("    " + cmd.Name + '\t' + cmd.Summary);
                     }
+                    help.AppendLine("```");
                 }
                 KonluluModule.HELP_STRING = help.ToString();
             }
