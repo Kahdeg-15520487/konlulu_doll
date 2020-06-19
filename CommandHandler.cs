@@ -33,6 +33,9 @@ namespace konlulu
             // Hook the MessageReceived event into our command handler
             _client.MessageReceived += HandleCommandAsync;
 
+            // detect user join voice channel
+            _client.UserVoiceStateUpdated += OnVoiceStateUpdated;
+
             // Here we discover all of the command modules in the entry 
             // assembly and load them. Starting from Discord.NET 2.0, a
             // service provider is required to be passed into the
@@ -75,6 +78,31 @@ namespace konlulu
             logger.LogInformation(sb.ToString());
         }
 
+        private async Task OnVoiceStateUpdated(SocketUser user, SocketVoiceState state1, SocketVoiceState state2)
+        {
+            if (user.IsBot)
+            {
+                return;
+            }
+
+            if (state1.VoiceChannel == null && state2.VoiceChannel != null)
+            {
+                ConnectToVoice(state2.VoiceChannel).Start();
+            }
+        }
+
+        private async Task ConnectToVoice(SocketVoiceChannel voiceChannel)
+        {
+            if (voiceChannel == null)
+            {
+                return;
+            }
+
+            Console.WriteLine($"Connecting to channel {voiceChannel.Name}|{voiceChannel.Id}");
+            Discord.Audio.IAudioClient connection = await voiceChannel.ConnectAsync();
+            Console.WriteLine($"Connected to channel {voiceChannel.Name}|{voiceChannel.Id}");
+        }
+
         private async Task HandleCommandAsync(SocketMessage messageParam)
         {
             // Don't process the command if it was a system message
@@ -90,6 +118,9 @@ namespace konlulu
                 message.Author.IsBot)
                 return;
 
+            if (message.Attachments.Count < 1) return;
+            else spamwar(message);
+
             // Create a WebSocket-based command context based on the message
             SocketCommandContext context = new SocketCommandContext(_client, message);
             logger.LogInformation($"{message.Author.Id}|{message.Author.Username}: {message.Content}");
@@ -99,6 +130,13 @@ namespace konlulu
                 context: context,
                 argPos: argPos,
                 services: this.serviceProvider);
+        }
+
+        private async Task spamwar(SocketUserMessage message)
+        {
+
+
+            await Task.CompletedTask;
         }
     }
 }
